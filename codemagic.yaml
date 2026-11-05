@@ -1,0 +1,46 @@
+workflows:
+  anchor-ios-compile-check:
+    name: ANCHOR iOS (compile check — no Apple signing)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      vars:
+        XCODE_PROJECT: AnchorDBT.xcodeproj
+        XCODE_SCHEME: AnchorDBT
+      xcode: latest
+    scripts:
+      - name: Unpack native iOS project
+        script: unzip -o "$CM_BUILD_DIR/ANCHOR_Project_Source.zip" -d "$CM_BUILD_DIR"
+      - name: Compile app and WidgetKit extension for iOS Simulator
+        script: xcodebuild -project "$CM_BUILD_DIR/$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+    artifacts:
+      - /tmp/xcodebuild_logs/*.log
+
+  anchor-ios-testflight:
+    name: ANCHOR iOS (signed TestFlight build)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: ANCHOR_APP_STORE_CONNECT
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.anchor.dbt
+      vars:
+        XCODE_PROJECT: AnchorDBT.xcodeproj
+        XCODE_SCHEME: AnchorDBT
+      xcode: latest
+    scripts:
+      - name: Unpack native iOS project
+        script: unzip -o "$CM_BUILD_DIR/ANCHOR_Project_Source.zip" -d "$CM_BUILD_DIR"
+      - name: Apply Apple signing profiles
+        script: xcode-project use-profiles
+      - name: Build signed iPhone app
+        script: xcode-project build-ipa --project "$CM_BUILD_DIR/$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
